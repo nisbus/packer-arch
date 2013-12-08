@@ -32,7 +32,8 @@ echo "==> mounting ${ROOT_PARTITION} to ${TARGET_DIR}"
 
 echo '==> bootstrapping the base installation'
 /usr/bin/pacstrap ${TARGET_DIR} base base-devel
-/usr/bin/arch-chroot ${TARGET_DIR} pacman -S --noconfirm gptfdisk openssh syslinux
+/usr/bin/arch-chroot ${TARGET_DIR} pacman -Syu --noconfirm
+/usr/bin/arch-chroot ${TARGET_DIR} pacman -S --noconfirm gptfdisk openssh syslinux wget git expac jshon ruby
 /usr/bin/arch-chroot ${TARGET_DIR} syslinux-install_update -i -a -m
 /usr/bin/sed -i 's/sda3/sda1/' "${TARGET_DIR}/boot/syslinux/syslinux.cfg"
 /usr/bin/sed -i 's/TIMEOUT 50/TIMEOUT 10/' "${TARGET_DIR}/boot/syslinux/syslinux.cfg"
@@ -85,6 +86,9 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 EOF
 
 echo '==> entering chroot and configuring system'
+/usr/bin/arch-chroot ${TARGET_DIR} wget https://aur.archlinux.org/packages/pa/packer/packer.tar.gz
+/usr/bin/arch-chroot ${TARGET_DIR} tar -xvf https://aur.archlinux.org/packages/pa/packer/packer.tar.gz && cd packer && mkpkg && pacman -U packer-*.pkg.tar.xz --noconfirm
+/usr/bin/arch-chroot ${TARGET_DIR} packer -S puppet
 /usr/bin/arch-chroot ${TARGET_DIR} ${CONFIG_SCRIPT}
 rm "${TARGET_DIR}${CONFIG_SCRIPT}"
 
