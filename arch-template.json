@@ -1,7 +1,7 @@
 {
     "variables": {
-        "iso_url": "http://mirrors.kernel.org/archlinux/iso/2013.09.01/archlinux-2013.09.01-dual.iso",
-        "iso_checksum": "3b087acd273656c55244baa7b7f1a147be7da990",
+        "iso_url": "http://mirrors.kernel.org/archlinux/iso/2013.12.01/archlinux-2013.12.01-dual.iso",
+        "iso_checksum": "31a37cd692eb9d0650e28f223f319cd6a22924ec",
         "iso_checksum_type": "sha1"
     },
     "builders": [
@@ -11,7 +11,7 @@
             "iso_checksum": "{{user `iso_checksum`}}",
             "iso_checksum_type": "{{user `iso_checksum_type`}}",
             "guest_os_type": "ArchLinux_64",
-            "guest_additions_mode": "disable",
+            "guest_additions_mode": "attach",
             "http_directory": ".",
             "boot_wait": "5s",
             "boot_command": [

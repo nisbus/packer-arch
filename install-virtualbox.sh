@@ -88,7 +88,8 @@ EOF
 echo '==> entering chroot and configuring system'
 /usr/bin/arch-chroot ${TARGET_DIR} wget https://aur.archlinux.org/packages/pa/packer/packer.tar.gz
 /usr/bin/arch-chroot ${TARGET_DIR} tar -xvf https://aur.archlinux.org/packages/pa/packer/packer.tar.gz && cd packer && mkpkg && pacman -U packer-*.pkg.tar.xz --noconfirm
-/usr/bin/arch-chroot ${TARGET_DIR} packer -S puppet
+/usr/bin/arch-chroot ${TARGET_DIR} packer -S puppet --noconfirm
+/usr/bin/arch-chroot ${TARGET_DIR} systemctl enable dhcpcd
 /usr/bin/arch-chroot ${TARGET_DIR} ${CONFIG_SCRIPT}
 rm "${TARGET_DIR}${CONFIG_SCRIPT}"
 
