@@ -35,7 +35,7 @@ echo '==> bootstrapping the base installation'
 echo '==> updating the base installation'
 /usr/bin/arch-chroot ${TARGET_DIR} pacman -Syu --noconfirm
 echo '==> installing basics'
-/usr/bin/arch-chroot ${TARGET_DIR} pacman -S --noconfirm linux-headers gptfdisk openssh syslinux wget git expac jshon ruby mlocate
+/usr/bin/arch-chroot ${TARGET_DIR} pacman -S --noconfirm linux-headers gptfdisk openssh syslinux wget git expac jshon ruby mlocate virtualbox-guest-utils virtualbox-guest-dkms
 /usr/bin/arch-chroot ${TARGET_DIR} syslinux-install_update -i -a -m
 /usr/bin/sed -i 's/sda3/sda1/' "${TARGET_DIR}/boot/syslinux/syslinux.cfg"
 /usr/bin/sed -i 's/TIMEOUT 50/TIMEOUT 10/' "${TARGET_DIR}/boot/syslinux/syslinux.cfg"
@@ -46,18 +46,6 @@ echo '==> generating the filesystem table'
 echo '==> generating the system configuration script'
 /usr/bin/install --mode=0755 /dev/null "${TARGET_DIR}${CONFIG_SCRIPT}"
 
-echo "==================> Installing packer and puppet"
-/usr/bin/mkdir packer && cd packer && /usr/bin/curl --output ./PKGBUILD https://aur.archlinux.org/packages/pa/packer/PKGBUILD && /usr/bin/makepkg && /usr/bin/pacman -U packer-*.pkg.tar.xz --noconfirm && cd .. >> /var/log/install.log
-/usr/bin/packer -S puppet --noconfirm >> /var/log/install.log
-echo "==================> Packer installed"
-
-echo "==================> Installing VirtualBox Guest Additions"
-/usr/bin/packer -S vboxguest-hook --noconfirm >> /var/log/install.log
-/usr/bin/pacman -S --noconfirm virtualbox-guest-utils virtualbox-guest-dkms >> /var/log/install.log
-echo -e 'vboxguest\nvboxsf\nvboxvideo' > /etc/modules-load.d/virtualbox.conf
-/usr/bin/systemctl enable dkms
-/usr/bin/systemctl enable vboxservice
-
 cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	echo '${FQDN}' > /etc/hostname
 	/usr/bin/ln -s /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
@@ -65,7 +53,7 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	/usr/bin/sed -i 's/#${LANGUAGE}/${LANGUAGE}/' /etc/locale.gen
 	
 	/usr/bin/locale-gen
-	/usr/bin/mkinitcpio -A vboxguest -p linux >> /var/log/install.log
+	/usr/bin/mkinitcpio -A vboxguest -p linux
 	/usr/bin/usermod --password ${PASSWORD} root
 	# https://wiki.archlinux.org/index.php/Network_Configuration#Device_names
 	/usr/bin/ln -s /dev/null /etc/udev/rules.d/80-net-name-slot.rules
@@ -75,19 +63,39 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 		
 	echo "======================>   Setting up network....................................."	
 	# enable dhcpcd
-	/usr/bin/systemctl enable dhcpcd >> /var/log/install.log
-		
-	echo "======================>   Setting up vagrant user....................................."		
+	/usr/bin/systemctl enable dhcpcd
+
+	echo "==================> Installing VirtualBox Guest Additions"	
+	echo -e 'vboxguest\nvboxsf\nvboxvideo' > /etc/modules-load.d/virtualbox.conf
+	/usr/bin/systemctl enable dkms
+	/usr/bin/systemctl enable vboxservice
+	
+	echo "======================>   Setting up vagrant user....................................."			
 	# Vagrant-specific configuration
 	/usr/bin/groupadd vagrant
 	/usr/bin/useradd --password ${PASSWORD} --comment 'Vagrant User' --create-home --gid users --groups vagrant,vboxsf vagrant
 	echo 'Defaults env_keep += "SSH_AUTH_SOCK"' > /etc/sudoers.d/10_vagrant
 	echo 'vagrant ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers.d/10_vagrant
-	/usr/bin/chmod 0440 /etc/sudoers.d/10_vagrant >> /var/log/install.log
+	/usr/bin/chmod 0440 /etc/sudoers.d/10_vagrant
 	/usr/bin/install --directory --owner=vagrant --group=users --mode=0700 /home/vagrant/.ssh
 	/usr/bin/curl --output /home/vagrant/.ssh/authorized_keys https://raw.github.com/mitchellh/vagrant/master/keys/vagrant.pub
 	/usr/bin/chown vagrant:users /home/vagrant/.ssh/authorized_keys
 	/usr/bin/chmod 0600 /home/vagrant/.ssh/authorized_keys
+
+	echo "==================> Installing packer and puppet"
+	echo "==================> Downloading and building packer"
+	echo ${PASSWORD} | su -c "/usr/bin/mkdir /home/vagrant/packer" vagrant 
+	echo ${PASSWORD} | su -c "/usr/bin/curl --output /home/vagrant/packer/PKGBUILD https://aur.archlinux.org/packages/pa/packer/PKGBUILD" vagrant 
+	cd /home/vagrant/packer && echo ${PASSWORD} | su -c /usr/bin/makepkg vagrant
+	echo "==================> Installing packer"
+	/usr/bin/pacman -U /home/vagrant/packer/packer-*.pkg.tar.xz --noconfirm	
+	echo "==================> Installing puppet"
+	/usr/bin/packer -S puppet --noconfirm
+	#A bug with the hiera dep makes this neccessary
+	/usr/bin/packer -S puppet --noconfirm
+	echo "==================> Installing vboxguest-hook"
+	/usr/bin/packer -S vboxguest-hook --noconfirm
+	echo "==================> Packer and vboxguest-hook installed"
 	
 	# workaround for shutdown race condition: http://comments.gmane.org/gmane.linux.arch.general/48739
 	/usr/bin/curl --output /etc/systemd/system/poweroff.timer https://raw.github.com/nisbus/packer-arch/master/poweroff.timer
@@ -103,7 +111,7 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 EOF
 
 echo '==> entering chroot and configuring system'
-/usr/bin/arch-chroot ${TARGET_DIR} ${CONFIG_SCRIPT}
+/usr/bin/arch-chroot ${TARGET_DIR} ${CONFIG_SCRIPT} 2>&1 | tee -a /var/log/install.log
 #rm "${TARGET_DIR}${CONFIG_SCRIPT}"
 
 echo '==> installation complete!...........................................'
